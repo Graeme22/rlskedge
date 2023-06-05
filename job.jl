@@ -4,27 +4,27 @@ export Job, Workload, WORKLOADS, job_cluster, job_queue
 
 const WORKLOADS = [
     "ANL-Intrepid-2009-1.swf",
-    "CEA-Curie-2011-2.1-cln.swf",
-    "CIEMAT-Euler-2008-1.swf",
+    #"CEA-Curie-2011-2.1-cln.swf",
+    #"CIEMAT-Euler-2008-1.swf",
     "CTC-SP2-1996-3.1-cln.swf",
-    "HPC2N-2002-2.2-cln.swf",
+    #"HPC2N-2002-2.2-cln.swf",
     "KIT-FH2-2016-1.swf",
-    "LANL-CM5-1994-4.1-cln.swf",
-    "LANL-O2K-1999-2.swf",
-    "LCG-2005-1.swf",
-    "LLNL-Thunder-2007-1.1-cln.swf",
-    "LLNL-uBGL-2006-2.swf",
-    "LPC-EGEE-2004-1.2-cln.swf",
-    "METACENTRUM-2013-3.swf",
-    "PIK-IPLEX-2009-1.swf",
-    "RICC-2010-2.swf",
+    #"LANL-CM5-1994-4.1-cln.swf",
+    #"LANL-O2K-1999-2.swf",
+    #"LCG-2005-1.swf",
+    #"LLNL-Thunder-2007-1.1-cln.swf",
+    #"LLNL-uBGL-2006-2.swf",
+    #"LPC-EGEE-2004-1.2-cln.swf",
+    #"METACENTRUM-2013-3.swf",
+    #"PIK-IPLEX-2009-1.swf",
+    #"RICC-2010-2.swf",
     "Sandia-Ross-2001-1.1-cln.swf",
-    "SDSC-BLUE-2000-4.2-cln.swf",
+    #"SDSC-BLUE-2000-4.2-cln.swf",
     "SDSC-DS-2004-2.1-cln.swf",
     "SDSC-Par-1995-3.1-cln.swf",
     "SDSC-SP2-1998-4.2-cln.swf",
-    "SHARCNET-2005-2.swf",
-    "SHARCNET-Whale-2005-2.swf"
+    #"SHARCNET-2005-2.swf",
+    #"SHARCNET-Whale-2005-2.swf"
 ]
 
 mutable struct Job
@@ -42,11 +42,12 @@ function Base.show(io::IO, j::Job)
     print(
         io,
         "J", j.job_id,
-        " #", j.cores,
+        "(#", j.cores,
         " @", j.submit_time,
-        " W", j.wait_time,
-        " R", j.run_time,
-        " /", j.requested_time
+        " W", j.simulated_wait_time,
+        " R", j.simulated_run_time,
+        " /", j.requested_time,
+        ")"
     )
 end
 
@@ -57,7 +58,7 @@ function Job(words::Vector{SubString{String}})
     wait_time = parse(Int, words[3])
     run_time = parse(Int, words[4])
     requested_time = parse(Int, words[9])
-    if requested_time == -1
+    if run_time > requested_time
         requested_time = run_time
     end
 
@@ -101,9 +102,15 @@ function Workload(name)
                 error("Improper workload format! Comments must include MaxProcs.")
             end
             j = Job(split(line))
-            push!(jobs, j)
-            if j.run_time > max_run_time
-                max_run_time = j.run_time
+            # filter illegal jobs
+            if j.cores > 0 && j.requested_time > 0 && j.run_time > 0
+                if j.wait_time < 0
+                    j.wait_time = 0
+                end
+                push!(jobs, j)
+                if j.run_time > max_run_time
+                    max_run_time = j.run_time
+                end
             end
         end
     end

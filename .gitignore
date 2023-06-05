@@ -110,3 +110,6 @@ venv.bak/
 .vscode/
 
 main.py
+data/CIEMAT-Euler-2008-1.swf
+data/METACENTRUM-2013-3.swf
+data/SHARCNET-2005-2.swf
