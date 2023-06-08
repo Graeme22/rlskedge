@@ -4,27 +4,27 @@ export Job, Workload, WORKLOADS, job_cluster, job_queue
 
 const WORKLOADS = [
     "ANL-Intrepid-2009-1.swf",
-    #"CEA-Curie-2011-2.1-cln.swf",
-    #"CIEMAT-Euler-2008-1.swf",
+    "CEA-Curie-2011-2.1-cln.swf",
+    "CIEMAT-Euler-2008-1.swf",
     "CTC-SP2-1996-3.1-cln.swf",
-    #"HPC2N-2002-2.2-cln.swf",
+    "HPC2N-2002-2.2-cln.swf",
     "KIT-FH2-2016-1.swf",
-    #"LANL-CM5-1994-4.1-cln.swf",
-    #"LANL-O2K-1999-2.swf",
-    #"LCG-2005-1.swf",
-    #"LLNL-Thunder-2007-1.1-cln.swf",
-    #"LLNL-uBGL-2006-2.swf",
-    #"LPC-EGEE-2004-1.2-cln.swf",
-    #"METACENTRUM-2013-3.swf",
-    #"PIK-IPLEX-2009-1.swf",
-    #"RICC-2010-2.swf",
+    "LANL-CM5-1994-4.1-cln.swf",
+    "LANL-O2K-1999-2.swf",
+    "LCG-2005-1.swf",
+    "LLNL-Thunder-2007-1.1-cln.swf",
+    "LLNL-uBGL-2006-2.swf",
+    "LPC-EGEE-2004-1.2-cln.swf",
+    "METACENTRUM-2013-3.swf",
+    "PIK-IPLEX-2009-1.swf",
+    "RICC-2010-2.swf",
     "Sandia-Ross-2001-1.1-cln.swf",
-    #"SDSC-BLUE-2000-4.2-cln.swf",
+    "SDSC-BLUE-2000-4.2-cln.swf",
     "SDSC-DS-2004-2.1-cln.swf",
     "SDSC-Par-1995-3.1-cln.swf",
     "SDSC-SP2-1998-4.2-cln.swf",
-    #"SHARCNET-2005-2.swf",
-    #"SHARCNET-Whale-2005-2.swf"
+    "SHARCNET-2005-2.swf",
+    "SHARCNET-Whale-2005-2.swf"
 ]
 
 mutable struct Job
@@ -43,13 +43,14 @@ function Base.show(io::IO, j::Job)
         io,
         "J", j.job_id,
         "(#", j.cores,
-        " @", j.submit_time,
         " W", j.simulated_wait_time,
-        " R", j.simulated_run_time,
-        " /", j.requested_time,
+        " ", j.simulated_run_time,
+        "/", j.requested_time,
         ")"
     )
 end
+
+Base.:(==)(j1::Job, j2::Job) = j1.job_id == j2.job_id
 
 function Job(words::Vector{SubString{String}})
     job_id = parse(Int, words[1])
@@ -114,7 +115,7 @@ function Workload(name)
             end
         end
     end
-    sort!(jobs, by = x -> x.job_id)
+    sort!(jobs, by = j -> j.submit_time)
 
     Workload(jobs, cores, max_run_time)
 end
