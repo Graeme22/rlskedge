@@ -86,6 +86,7 @@ function Workload(name)
     jobs = []
     max_run_time = 0
     cores = 0
+    println("Loading workload ", name, "...")
     open("data/" * name) do fp
         for line in eachline(fp)
             if line == ""

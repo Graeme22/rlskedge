@@ -34,16 +34,16 @@ mutable struct ClusterEnv <: AbstractEnv
 end
 
 function RLBase.reset!(env::ClusterEnv)
-    workload = Workload(rand(WORKLOADS))
-    env.workload = workload
-    env.time = workload.jobs[1].submit_time
-    env.next_job_index = 1
+    #workload = Workload(rand(WORKLOADS))
+    #env.workload = workload
+    env.time = env.workload.jobs[1].submit_time
+    env.next_job_index = 2
     env.reward = 0
     env.done = false
     env.cluster = []
-    env.queue = [workload.jobs[1]]
+    env.queue = [env.workload.jobs[1]]
     env.are_pending_jobs = true
-    env.available_cores = workload.cores
+    env.available_cores = env.workload.cores
     env.utilization = []
     env.metrics = nothing
 end
@@ -51,7 +51,7 @@ end
 function ClusterEnv()
     workload = Workload(rand(WORKLOADS))
     time = workload.jobs[1].submit_time
-    next_job_index = 1
+    next_job_index = 2
     reward = 0
     done = false
     cluster = []
@@ -64,10 +64,10 @@ function ClusterEnv()
     ClusterEnv(workload, time, next_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
 end
 
-function ClusterEnv(index::Int)
+function ClusterEnv(index)
     workload = Workload(WORKLOADS[index])
     time = workload.jobs[1].submit_time
-    next_job_index = 1
+    next_job_index = 2
     reward = 0
     done = false
     cluster = []
