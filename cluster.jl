@@ -64,14 +64,30 @@ function ClusterEnv()
     ClusterEnv(workload, time, next_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
 end
 
+function ClusterEnv(index::Int)
+    workload = Workload(WORKLOADS[index])
+    time = workload.jobs[1].submit_time
+    next_job_index = 1
+    reward = 0
+    done = false
+    cluster = []
+    queue = [workload.jobs[1]]
+    are_pending_jobs = true
+    available_cores = workload.cores
+    utilization = []
+    metrics = nothing
+
+    ClusterEnv(workload, time, next_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
+end
+
 RLBase.action_space(env::ClusterEnv) = Base.OneTo(QUEUE_SIZE)
-RLBase.state_space(env::ClusterEnv) = Space(fill(0..Inf, QUEUE_SIZE, ZONES + 4))
+RLBase.state_space(env::ClusterEnv) = Space(fill(0..Inf, ZONES + 4, QUEUE_SIZE))
 RLBase.reward(env::ClusterEnv) = env.reward
 RLBase.is_terminated(env::ClusterEnv) = env.done
 
 function RLBase.state(env::ClusterEnv)
     if env.queue == []
-        return fill(0, QUEUE_SIZE, ZONES + 4)
+        return fill(0, ZONES + 4, QUEUE_SIZE)
     end
 
     if env.cluster == []
@@ -81,23 +97,18 @@ function RLBase.state(env::ClusterEnv)
         buffer = fill(0, env.available_cores)
         cluster = reduce(vcat, cluster)
         cluster = reduce(vcat, [cluster, buffer])
-        stride = cld(env.workload.cores, ZONES)
-        cluster = cluster[1:stride:end]  # length is now ZONES
+        stride = env.workload.cores / ZONES
+        cluster = [cluster[round(Int, i * stride)] for i in 1:ZONES]
     end
 
-    if length(env.queue) > QUEUE_SIZE
-        jobs = [job_queue(j, env.workload.max_run_time, env.workload.cores, env.available_cores) for j in env.queue[1:QUEUE_SIZE]]
-    else
-        jobs = [job_queue(j, env.workload.max_run_time, env.workload.cores, env.available_cores) for j in env.queue]
-    end
-    queue = reduce(hcat, jobs)'
-
-    n_queued_jobs = size(queue)[1]
-    cluster = repeat(cluster, 1, n_queued_jobs)'
+    n_queued_jobs = length(env.queue) < QUEUE_SIZE ? length(env.queue) : QUEUE_SIZE
+    jobs = [job_queue(j, env.workload.max_run_time, env.workload.cores, env.available_cores) for j in env.queue[1:n_queued_jobs]]
+    queue = reduce(hcat, jobs)
+    cluster = repeat(cluster, 1, n_queued_jobs)
     
-    obs = hcat(queue, cluster)
-    padding = fill(0, QUEUE_SIZE - n_queued_jobs, ZONES + 4)
-    obs = vcat(obs, padding)
+    obs = vcat(queue, cluster)
+    padding = fill(0, ZONES + 4, QUEUE_SIZE - n_queued_jobs)
+    obs = hcat(obs, padding)
 
     obs
 end
@@ -116,7 +127,7 @@ end
 
 function (env::ClusterEnv)(action)
     # FCFS
-    #action = 1
+    action = 1
     # SJF
     """
     action = 1

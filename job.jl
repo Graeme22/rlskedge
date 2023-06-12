@@ -31,7 +31,6 @@ mutable struct Job
     job_id::Int
     cores::Int
     submit_time::Int
-    wait_time::Int
     run_time::Int
     requested_time::Int
     simulated_run_time::Int
@@ -56,14 +55,13 @@ function Job(words::Vector{SubString{String}})
     job_id = parse(Int, words[1])
     cores = parse(Int, words[5])
     submit_time = parse(Int, words[2])
-    wait_time = parse(Int, words[3])
     run_time = parse(Int, words[4])
     requested_time = parse(Int, words[9])
     if run_time > requested_time
         requested_time = run_time
     end
 
-    Job(job_id, cores, submit_time, wait_time, run_time, requested_time, 0, 0)
+    Job(job_id, cores, submit_time, run_time, requested_time, 0, 0)
 end
 
 function job_cluster(job::Job, max_run_time::Int)
@@ -71,7 +69,7 @@ function job_cluster(job::Job, max_run_time::Int)
 end
 
 function job_queue(job::Job, max_run_time::Int, total_cores::Int, available_cores::Int)
-    return [job.wait_time / max_run_time, job.requested_time / max_run_time, job.cores / total_cores, float(available_cores >= job.cores)]
+    return [job.simulated_wait_time / max_run_time, job.requested_time / max_run_time, job.cores / total_cores, float(available_cores >= job.cores)]
 end
 
 struct Workload
@@ -105,9 +103,6 @@ function Workload(name)
             j = Job(split(line))
             # filter illegal jobs
             if j.cores > 0 && j.requested_time > 0 && j.run_time > 0
-                if j.wait_time < 0
-                    j.wait_time = 0
-                end
                 push!(jobs, j)
                 if j.run_time > max_run_time
                     max_run_time = j.run_time

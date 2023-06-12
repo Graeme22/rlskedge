@@ -9,21 +9,30 @@ using .cluster
 N_ENV = 2
 UPDATE_FREQ = 32
 env = MultiThreadEnv([ClusterEnv() for i in 1:N_ENV])
-# (QUEUE_SIZE, ZONES + 4); QUEUE_SIZE
-ns, na = size(state(env[1])), length(action_space(env[1]))
+
 agent = Agent(
     policy = PPOPolicy(
         approximator = ActorCritic(
             actor = Chain(
-                Dense(ns[end], 256, relu),
-                Dense(256, na)
+                x -> reshape(x, ZONES + 4, QUEUE_SIZE, :),
+                Dense(ZONES + 4, 1024, relu),
+                Dense(1024, 1024, relu),
+                Dense(1024, 1),
+                x -> reshape(x, QUEUE_SIZE, :)  # squeeze
             ),
             critic = Chain(
-                Dense(ns[end], 256, relu),
-                Dense(256, 1)
+                x -> reshape(x, ZONES + 4, QUEUE_SIZE, :),
+                Dense(ZONES + 4, 256, relu),
+                Dense(256, 256, relu),
+                Dense(256, 1),
+                x -> reshape(x, QUEUE_SIZE, :),  # squeeze
+                Dense(QUEUE_SIZE, 256, relu),
+                Dense(256, 256, relu),
+                Dense(256, 1),
+                x -> reshape(x, :)  # squeeze
             ),
             optimizer = ADAM(1e-3)
-        ),# |> gpu,
+        ) |> cpu,
         γ = 0.99f0,
         λ = 0.95f0,
         clip_range = 0.2f0,
@@ -37,9 +46,9 @@ agent = Agent(
     ),
     trajectory = MaskedPPOTrajectory(;
         capacity = UPDATE_FREQ,
-        state = Array{Float32, 3} => (ns..., N_ENV),
+        state = Array{Float32, 3} => (ZONES + 4, QUEUE_SIZE, N_ENV),
         action = Vector{Int} => (N_ENV,),
-        legal_actions_mask = Vector{Bool} => (na, N_ENV),
+        legal_actions_mask = Vector{Bool} => (QUEUE_SIZE, N_ENV),
         action_log_prob = Vector{Float32} => (N_ENV,),
         reward = Vector{Float32} => (N_ENV,),
         terminal = Vector{Bool} => (N_ENV,)
