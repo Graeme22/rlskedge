@@ -127,7 +127,7 @@ end
 
 function (env::ClusterEnv)(action)
     # FCFS
-    action = 1
+    #action = 1
     # SJF
     """
     action = 1
@@ -159,9 +159,9 @@ function (env::ClusterEnv)(action)
             n_queued_jobs = length(env.queue) < QUEUE_SIZE ? length(env.queue) : QUEUE_SIZE
             to_remove = []
             # TODO: sort using logits for policy
-            #sorted = sort(env.queue, by = _ -> rand()) # randomize order until we have logits
+            sorted = sort(env.queue, by = _ -> rand()) # randomize order
             # FCFS
-            sorted = sort(env.queue, by = j -> j.submit_time)
+            #sorted = sort(env.queue, by = j -> j.submit_time)
             # SJF
             #sorted = sort(env.queue, by = j -> j.requested_time)
             for i in 1:n_queued_jobs
