@@ -55,7 +55,7 @@ agent = Agent(
     )
 )
 
-stop_condition = StopAfterEpisode(4)
+stop_condition = StopAfterStep(100000)
 hook = TotalBatchRewardPerEpisode(N_ENV)
 experiment = Experiment(agent, env, stop_condition, hook, "rlskedge-ppo")
 

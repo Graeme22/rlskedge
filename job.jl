@@ -73,6 +73,7 @@ struct Workload
     jobs::Vector{Job}
     cores::Int
     max_run_time::Int
+    sjf_bsld::Float32
 end
 
 function Base.show(io::IO, w::Workload)
@@ -83,6 +84,7 @@ function Workload(name)
     jobs = []
     max_run_time = 0
     cores = 0
+    sjf_bsld = 0
     println("Loading workload ", name, "...")
     open("data/" * name) do fp
         for line in eachline(fp)
@@ -90,8 +92,12 @@ function Workload(name)
                 continue
             end
             if line[1] == ';'
-                if length(line) >= 10 && line[1:10] == "; MaxProcs"
+                if length(line) > 10 && line[1:10] == "; MaxProcs"
                     cores = parse(Int, split(line, ":")[2])
+                end
+                if length(line) > 22 && line[1:22] == "; sjf_bounded_slowdown"
+                    # julia can't parse its own Float32 format :(
+                    sjf_bsld = parse(Float32, replace(split(line, ":")[2], "f" => "e"))
                 end
                 continue
             end
@@ -110,7 +116,7 @@ function Workload(name)
     end
     sort!(jobs, by = j -> j.submit_time)
 
-    Workload(jobs, cores, max_run_time)
+    Workload(jobs, cores, max_run_time, sjf_bsld)
 end
 
 end

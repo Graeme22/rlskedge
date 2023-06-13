@@ -10,7 +10,7 @@ using .job
 
 export ClusterEnv, QUEUE_SIZE, ZONES
 
-const QUEUE_SIZE, ZONES = 128, 32
+const QUEUE_SIZE, ZONES, SLICE_SIZE = 128, 32, 50_000
 
 struct Metrics
     avg_bounded_slowdown::Float32
@@ -23,6 +23,7 @@ mutable struct ClusterEnv <: AbstractEnv
     workload::Workload
     time::Int
     next_job_index::Int
+    last_job_index::Int
     reward::Float32
     done::Bool
     cluster::Vector{Job}
@@ -33,15 +34,19 @@ mutable struct ClusterEnv <: AbstractEnv
     metrics::Union{Nothing, Metrics}
 end
 
+choose_index(wl::Workload) = rand(1:length(wl.jobs) - SLICE_SIZE)
+
 function RLBase.reset!(env::ClusterEnv)
-    #workload = Workload(rand(WORKLOADS))
-    #env.workload = workload
+    workload = Workload(rand(WORKLOADS))
+    env.workload = workload
+    index = choose_index(workload)
     env.time = env.workload.jobs[1].submit_time
-    env.next_job_index = 2
+    env.next_job_index = index + 1
+    env.last_job_index = index + SLICE_SIZE
     env.reward = 0
     env.done = false
     env.cluster = []
-    env.queue = [env.workload.jobs[1]]
+    env.queue = [env.workload.jobs[index]]
     env.are_pending_jobs = true
     env.available_cores = env.workload.cores
     env.utilization = []
@@ -50,34 +55,20 @@ end
 
 function ClusterEnv()
     workload = Workload(rand(WORKLOADS))
+    index = choose_index(workload)
     time = workload.jobs[1].submit_time
-    next_job_index = 2
+    next_job_index = index + 1
+    last_job_index = index + SLICE_SIZE
     reward = 0
     done = false
     cluster = []
-    queue = [workload.jobs[1]]
+    queue = [workload.jobs[index]]
     are_pending_jobs = true
     available_cores = workload.cores
     utilization = []
     metrics = nothing
 
-    ClusterEnv(workload, time, next_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
-end
-
-function ClusterEnv(index)
-    workload = Workload(WORKLOADS[index])
-    time = workload.jobs[1].submit_time
-    next_job_index = 2
-    reward = 0
-    done = false
-    cluster = []
-    queue = [workload.jobs[1]]
-    are_pending_jobs = true
-    available_cores = workload.cores
-    utilization = []
-    metrics = nothing
-
-    ClusterEnv(workload, time, next_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
+    ClusterEnv(workload, time, next_job_index, last_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
 end
 
 RLBase.action_space(env::ClusterEnv) = Base.OneTo(QUEUE_SIZE)
@@ -214,7 +205,7 @@ function (env::ClusterEnv)(action)
         end
         
         # check for termination
-        if env.next_job_index > length(env.workload.jobs)  # no more pending jobs!
+        if env.next_job_index > env.last_job_index  # no more pending jobs!
             env.are_pending_jobs = false
         end
         # we've finished!
@@ -233,8 +224,8 @@ function (env::ClusterEnv)(action)
             bslds = [max((j.simulated_wait_time + j.simulated_run_time) / max(j.simulated_run_time, 10), 1) for j in env.workload.jobs]
             sum_bslds = +(bslds...)
             avg_bsld = sum_bslds / length(env.workload.jobs)
-            # currently: negative average bounded slowdown
-            env.reward = -avg_bsld
+            # currently: negative average bounded slowdown relative to SJF
+            env.reward = env.workload.sjf_bsld - avg_bsld
             env.done = true
             env.metrics = Metrics(avg_bsld, avg_wait_time, max_wait_time, avg_utilization)
             break
