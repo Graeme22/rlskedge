@@ -36,8 +36,11 @@ end
 
 choose_index(wl::Workload) = rand(1:length(wl.jobs) - SLICE_SIZE)
 
+# load all workloads into memory; about 3GB
+workloads = [Workload(wl) for wl in WORKLOADS]
+
 function RLBase.reset!(env::ClusterEnv)
-    workload = Workload(rand(WORKLOADS))
+    workload = rand(workloads)
     env.workload = workload
     index = choose_index(workload)
     env.time = env.workload.jobs[1].submit_time
@@ -54,7 +57,7 @@ function RLBase.reset!(env::ClusterEnv)
 end
 
 function ClusterEnv()
-    workload = Workload(rand(WORKLOADS))
+    workload = rand(workloads)
     index = choose_index(workload)
     time = workload.jobs[1].submit_time
     next_job_index = index + 1
