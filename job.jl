@@ -5,7 +5,7 @@ export Job, Workload, WORKLOADS, job_cluster, job_queue
 const WORKLOADS = [
     "ANL-Intrepid-2009-1.swf",
     "CEA-Curie-2011-2.1-cln.swf",
-    "CIEMAT-Euler-2008-1.swf",
+    #"CIEMAT-Euler-2008-1.swf",
     "CTC-SP2-1996-3.1-cln.swf",
     "HPC2N-2002-2.2-cln.swf",
     "KIT-FH2-2016-1.swf",
@@ -13,14 +13,14 @@ const WORKLOADS = [
     "LANL-O2K-1999-2.swf",
     "LLNL-Thunder-2007-1.1-cln.swf",
     "LPC-EGEE-2004-1.2-cln.swf",
-    "METACENTRUM-2013-3.swf",
+    #"METACENTRUM-2013-3.swf",
     "PIK-IPLEX-2009-1.swf",
     "Sandia-Ross-2001-1.1-cln.swf",
     "SDSC-BLUE-2000-4.2-cln.swf",
     "SDSC-DS-2004-2.1-cln.swf",
     "SDSC-Par-1995-3.1-cln.swf",
     "SDSC-SP2-1998-4.2-cln.swf",
-    "SHARCNET-2005-2.swf",
+    #"SHARCNET-2005-2.swf",
     "SHARCNET-Whale-2005-2.swf"
 ]
 

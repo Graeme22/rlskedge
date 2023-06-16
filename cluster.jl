@@ -1,5 +1,6 @@
 module cluster
 
+using Flux
 using ReinforcementLearning
 using IntervalSets
 using Statistics
@@ -16,7 +17,7 @@ struct Metrics
     avg_bounded_slowdown::Float32
     avg_wait_time::Float32
     max_wait_time::Int
-    avg_utilization::Float32
+    #avg_utilization::Float32
 end
 
 mutable struct ClusterEnv <: AbstractEnv
@@ -30,8 +31,9 @@ mutable struct ClusterEnv <: AbstractEnv
     queue::Vector{Job}
     are_pending_jobs::Bool
     available_cores::Int
-    utilization::Vector{Float32}
+    #utilization::Vector{Float32}
     metrics::Union{Nothing, Metrics}
+    logits::Vector{Float32}
 end
 
 choose_index(wl::Workload) = rand(1:length(wl.jobs) - SLICE_SIZE)
@@ -52,7 +54,7 @@ function RLBase.reset!(env::ClusterEnv)
     env.queue = [env.workload.jobs[index]]
     env.are_pending_jobs = true
     env.available_cores = env.workload.cores
-    env.utilization = []
+    #env.utilization = []
     env.metrics = nothing
 end
 
@@ -68,16 +70,37 @@ function ClusterEnv()
     queue = [workload.jobs[index]]
     are_pending_jobs = true
     available_cores = workload.cores
-    utilization = []
+    #utilization = []
     metrics = nothing
+    logits = []
 
-    ClusterEnv(workload, time, next_job_index, last_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, utilization, metrics)
+    ClusterEnv(workload, time, next_job_index, last_job_index, reward, done, cluster, queue, are_pending_jobs, available_cores, metrics, logits)
 end
 
 RLBase.action_space(env::ClusterEnv) = Base.OneTo(QUEUE_SIZE)
 RLBase.state_space(env::ClusterEnv) = Space(fill(0..Inf, ZONES + 4, QUEUE_SIZE))
 RLBase.reward(env::ClusterEnv) = env.reward
 RLBase.is_terminated(env::ClusterEnv) = env.done
+
+# override
+function RLBase.prob(p::PPOPolicy, env::MultiThreadEnv)
+    mask = ActionStyle(env) === FULL_ACTION_SET ? legal_action_space_mask(env) : nothing
+    all_logits = prob(p, state(env), mask)
+    for i in 1:length(all_logits)
+        env[i].logits = all_logits[i].p
+    end
+    all_logits
+end
+
+# override
+function RLBase.legal_action_space_mask(env::MultiThreadEnv)
+    N = ndims(env.legal_action_space_mask)
+    @sync for i in 1:length(env)
+        @spawn selectdim(env.legal_action_space_mask, N, i) .=
+            legal_action_space_mask(env[i])
+    end
+    env.legal_action_space_mask
+end
 
 function RLBase.state(env::ClusterEnv)
     if env.queue == []
@@ -152,8 +175,11 @@ function (env::ClusterEnv)(action)
             end
             n_queued_jobs = length(env.queue) < QUEUE_SIZE ? length(env.queue) : QUEUE_SIZE
             to_remove = []
-            # TODO: sort using logits for policy
-            sorted = sort(env.queue, by = _ -> rand()) # randomize order
+            # sort by logits
+            perm = sortperm(env.logits[1:n_queued_jobs], rev = true)
+            sorted = env.queue[perm]
+            # random
+            #sorted = sort(env.queue, by = _ -> rand())
             # FCFS
             #sorted = sort(env.queue, by = j -> j.submit_time)
             # SJF
@@ -170,7 +196,7 @@ function (env::ClusterEnv)(action)
 
         # based on jobs not yet in queue i.e. pending jobs
         step_pending = env.are_pending_jobs ? env.workload.jobs[env.next_job_index].submit_time - env.time : env.workload.max_run_time
-        step_benchmark = 3600 - env.time % 3600  # every hour
+        #step_benchmark = 3600 - env.time % 3600  # every hour
 
         if env.cluster != []
             shortest_job_index = findmin(j -> j.run_time - j.simulated_run_time, env.cluster)[2]
@@ -180,7 +206,7 @@ function (env::ClusterEnv)(action)
             step_cluster = Inf
         end
 
-        step = min(step_pending, step_benchmark, step_cluster)
+        step = min(step_pending, step_cluster) #step_benchmark
         env.time += step
         for j in env.cluster
             j.simulated_run_time += step
@@ -203,9 +229,9 @@ function (env::ClusterEnv)(action)
             push!(env.queue, env.workload.jobs[env.next_job_index])
             env.next_job_index += 1
         end
-        if step_benchmark == step
-            push!(env.utilization, env.available_cores / env.workload.cores)
-        end
+        #if step_benchmark == step
+        #    push!(env.utilization, env.available_cores / env.workload.cores)
+        #end
         
         # check for termination
         if env.next_job_index > env.last_job_index  # no more pending jobs!
@@ -223,14 +249,16 @@ function (env::ClusterEnv)(action)
                 end
             end
             avg_wait_time /= length(env.workload.jobs)
-            avg_utilization = mean(env.utilization)
+            #avg_utilization = mean(env.utilization)
             bslds = [max((j.simulated_wait_time + j.simulated_run_time) / max(j.simulated_run_time, 10), 1) for j in env.workload.jobs]
             sum_bslds = +(bslds...)
             avg_bsld = sum_bslds / length(env.workload.jobs)
             # currently: negative average bounded slowdown relative to SJF
+            # positive reward = better performance than SJF;
+            # negative = worse; zero = same
             env.reward = env.workload.sjf_bsld - avg_bsld
             env.done = true
-            env.metrics = Metrics(avg_bsld, avg_wait_time, max_wait_time, avg_utilization)
+            env.metrics = Metrics(avg_bsld, avg_wait_time, max_wait_time)#, avg_utilization)
             break
         else
             sort!(env.cluster, by = j -> j.requested_time - j.simulated_run_time, rev = true)
