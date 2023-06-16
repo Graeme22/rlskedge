@@ -6,7 +6,7 @@ include("./cluster.jl")
 using .cluster
 
 #save_dir = nothing
-N_ENV = 2
+N_ENV = 8
 UPDATE_FREQ = 32
 env = MultiThreadEnv([ClusterEnv() for i in 1:N_ENV])
 
@@ -55,8 +55,7 @@ agent = Agent(
     )
 )
 
-stop_condition = StopAfterStep(100000)
+stop_condition = StopAfterStep(1000000)
 hook = TotalBatchRewardPerEpisode(N_ENV)
-experiment = Experiment(agent, env, stop_condition, hook, "rlskedge-ppo")
 
-run(experiment)
+run(agent, env, stop_condition, hook)
