@@ -12,45 +12,41 @@ using .cluster
 
 save_dir = "save"
 N_ENV = 8
-UPDATE_FREQ = 32
+TRAJECTORY_SIZE = 1024
 env = MultiThreadEnv([ClusterEnv() for i in 1:N_ENV])
+
+shared_network = Chain(
+    x -> reshape(x, ZONES + 4, QUEUE_SIZE, :),
+    Dense(ZONES + 4, 512, relu),
+    Dense(512, 1),
+    x -> reshape(x, QUEUE_SIZE, :)  # squeeze
+)
 
 agent = Agent(
     policy = PPOPolicy(
         approximator = ActorCritic(
-            actor = Chain(
-                x -> reshape(x, ZONES + 4, QUEUE_SIZE, :),
-                Dense(ZONES + 4, 1024, relu),
-                Dense(1024, 1024, relu),
-                Dense(1024, 1),
-                x -> reshape(x, QUEUE_SIZE, :)  # squeeze
-            ),
+            actor = shared_network,
             critic = Chain(
-                x -> reshape(x, ZONES + 4, QUEUE_SIZE, :),
-                Dense(ZONES + 4, 256, relu),
-                Dense(256, 256, relu),
-                Dense(256, 1),
-                x -> reshape(x, QUEUE_SIZE, :),  # squeeze
+                shared_network,
                 Dense(QUEUE_SIZE, 256, relu),
-                Dense(256, 256, relu),
                 Dense(256, 1),
                 x -> reshape(x, :)  # squeeze
             ),
-            optimizer = ADAM(1e-3)
+            optimizer = Adam(1e-5)
         ) |> gpu,
         γ = 0.99f0,
         λ = 0.95f0,
         clip_range = 0.2f0,
         max_grad_norm = 0.5f0,
-        n_epochs = 4,
-        n_microbatches = 4,
+        n_epochs = 50,
+        n_microbatches = 32,
         actor_loss_weight = 1.0f0,
         critic_loss_weight = 0.5f0,
         entropy_loss_weight = 0.001f0,
-        update_freq = UPDATE_FREQ
+        update_freq = TRAJECTORY_SIZE
     ),
     trajectory = MaskedPPOTrajectory(;
-        capacity = UPDATE_FREQ,
+        capacity = TRAJECTORY_SIZE,
         state = Array{Float32, 3} => (ZONES + 4, QUEUE_SIZE, N_ENV),
         action = Vector{Int} => (N_ENV,),
         legal_actions_mask = Vector{Bool} => (QUEUE_SIZE, N_ENV),
@@ -67,11 +63,11 @@ end
 
 logger = TBLogger(joinpath(save_dir, "tb_log"), min_level = Logging.Info)
 
-rewards = TotalBatchRewardPerEpisode(N_ENV)
+rwd = TotalBatchRewardPerEpisode(N_ENV)
 param_dir = mktempdir()
 stop_condition = StopAfterStep(1000000)
 hook = ComposedHook(
-    rewards,
+    rwd,
     BatchStepsPerEpisode(N_ENV),
     TimeCostPerEpisode(),
     DoEveryNStep(;n=1000000) do t, agent, env
@@ -88,7 +84,7 @@ hook = ComposedHook(
     end,
     DoEveryNStep(;n=1000) do t, agent, env
 	with_logger(logger) do
-	    rw = [rewards.rewards[i][end] for i in 1:length(env) if is_terminated(env[i])]
+	    rw = [rwd.rewards[i][end] for i in 1:length(env) if is_terminated(env[i])]
 	    if length(rw) > 0
 	        @info "training" rewards = mean(rewards)
 	    end

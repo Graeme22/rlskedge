@@ -11,7 +11,7 @@ using .job
 
 export ClusterEnv, QUEUE_SIZE, ZONES
 
-const QUEUE_SIZE, ZONES, SLICE_SIZE = 128, 32, 50_000
+const QUEUE_SIZE, ZONES, SLICE_SIZE = 64, 16, 50_000
 
 struct Metrics
     avg_bounded_slowdown::Float32
@@ -132,6 +132,8 @@ function RLBase.legal_action_space_mask(env::ClusterEnv)
     mask .== 1
 end
 
+bounded_slowdown(j) = max((j.simulated_wait_time + j.simulated_run_time) / max(j.simulated_run_time, 10), 1)
+
 function (env::ClusterEnv)(action)
     # FCFS
     #action = 1
@@ -240,7 +242,7 @@ function (env::ClusterEnv)(action)
             end
             avg_wait_time /= length(env.workload.jobs)
             #avg_utilization = mean(env.utilization)
-            bslds = [max((j.simulated_wait_time + j.simulated_run_time) / max(j.simulated_run_time, 10), 1) for j in env.workload.jobs]
+            bslds = [bounded_slowdown(j) for j in env.workload.jobs]
             sum_bslds = +(bslds...)
             avg_bsld = sum_bslds / length(env.workload.jobs)
             # currently: negative average bounded slowdown relative to SJF
