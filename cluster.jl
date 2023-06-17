@@ -92,16 +92,6 @@ function RLBase.prob(p::PPOPolicy, env::MultiThreadEnv)
     all_logits
 end
 
-# override
-function RLBase.legal_action_space_mask(env::MultiThreadEnv)
-    N = ndims(env.legal_action_space_mask)
-    @sync for i in 1:length(env)
-        @spawn selectdim(env.legal_action_space_mask, N, i) .=
-            legal_action_space_mask(env[i])
-    end
-    env.legal_action_space_mask
-end
-
 function RLBase.state(env::ClusterEnv)
     if env.queue == []
         return fill(0, ZONES + 4, QUEUE_SIZE)
