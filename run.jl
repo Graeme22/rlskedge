@@ -12,15 +12,15 @@ using .cluster
 
 save_dir = "save"
 N_ENV = 8
-TRAJECTORY_SIZE = 1024
-N_TRAIN_ITERATION = 50
-N_EPOCH = 500
+TRAJECTORY_SIZE = 64
+N_TRAIN_ITERATION = 150
+N_EPOCH = 50
 env = MultiThreadEnv([ClusterEnv() for i in 1:N_ENV])
 
 shared_network = Chain(
     x -> reshape(x, ZONES + 4, QUEUE_SIZE, :),
-    Dense(ZONES + 4, 512, relu),
-    Dense(512, 1),
+    Dense(ZONES + 4, 128, relu),
+    Dense(128, 1),
     x -> reshape(x, QUEUE_SIZE, :)  # squeeze
 )
 
@@ -30,8 +30,8 @@ agent = Agent(
             actor = shared_network,
             critic = Chain(
                 shared_network,
-                Dense(QUEUE_SIZE, 256, relu),
-                Dense(256, 1),
+                Dense(QUEUE_SIZE, 128, relu),
+                Dense(128, 1),
                 x -> reshape(x, :)  # squeeze
             ),
             optimizer = Adam(1e-5)

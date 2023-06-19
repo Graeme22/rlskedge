@@ -11,7 +11,7 @@ using .job
 
 export ClusterEnv, QUEUE_SIZE, ZONES
 
-const QUEUE_SIZE, ZONES, SLICE_SIZE = 64, 16, 50_000
+const QUEUE_SIZE, ZONES, SLICE_SIZE = 64, 16, 8192
 
 struct Metrics
     avg_bounded_slowdown::Float32
@@ -212,6 +212,7 @@ function (env::ClusterEnv)(action)
             for i in 1:length(env.cluster)
                 if env.cluster[i].simulated_run_time >= env.cluster[i].run_time
                     env.available_cores += env.cluster[i].cores
+                    env.reward += env.sjf_bsld - bounded_slowdown(env.cluster[i])
                     push!(to_remove, i)
                 end
             end
@@ -248,7 +249,7 @@ function (env::ClusterEnv)(action)
             # currently: negative average bounded slowdown relative to SJF
             # positive reward = better performance than SJF;
             # negative = worse; zero = same
-            env.reward = env.workload.sjf_bsld - avg_bsld
+            #env.reward = env.workload.sjf_bsld - avg_bsld
             env.done = true
             env.metrics = Metrics(avg_bsld, avg_wait_time, max_wait_time)#, avg_utilization)
             break
