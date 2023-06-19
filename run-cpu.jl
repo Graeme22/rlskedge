@@ -10,7 +10,7 @@ using Statistics
 include("./cluster.jl")
 using .cluster
 
-save_dir = "save"
+save_dir = "save-cpu"
 N_ENV = 8
 TRAJECTORY_SIZE = 1024
 N_TRAIN_ITERATION = 50
@@ -35,7 +35,7 @@ agent = Agent(
                 x -> reshape(x, :)  # squeeze
             ),
             optimizer = Adam(1e-5)
-        ) |> gpu,
+        ) |> cpu,
         γ = 0.99f0,
         λ = 0.95f0,
         clip_range = 0.2f0,
